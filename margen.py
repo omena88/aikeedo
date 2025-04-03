@@ -42,10 +42,10 @@ def procesar_margenes(
         logger.info("Archivo Ventas_MN.xlsx cargado.")
 
         # Seleccionar columnas relevantes y renombrar
-        cols = ['Fecha', 'T. Doc.', 'Número', 'Cliente', 'Artículo', 'Descripción', 'Cantidad', 'Und.', 'Valor Unit', 'Valor Vta.']
+        cols = ['Fecha', 'T. Doc.', 'Número', 'Cliente', 'Artículo', 'Descripción', 'Cantidad', 'Und.', 'Valor. Unit', 'Valor Vta.']
         me_df = me_df[cols].rename(columns={'Valor Vta.': 'Valor Vta. ME'})
         mn_df = mn_df[cols].rename(columns={'Valor Vta.': 'Valor Vta. MN'})
-        logger.info("Columnas seleccionadas y renombradas para ventas.")
+        logger.info("Columnas seleccionadas y renombradas para ventas (usando 'Valor. Unit').")
 
         # Unir ME y MN
         # Asegurarse que las columnas clave sean del mismo tipo antes de unir
