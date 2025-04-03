@@ -1,5 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, UploadFile, File, Form, Response
+from fastapi.responses import FileResponse, StreamingResponse
 import pandas as pd
 from datetime import datetime
 from openpyxl import Workbook
@@ -7,11 +7,18 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Font, Alignment, Border, Side
 import os
 import tempfile
+import logging
+import io
 
 app = FastAPI(title="Procesador de Cuentas por Cobrar",
              description="API para procesar archivos de cuentas por cobrar y generar reportes de Aging")
 
+# Configurar logging básico
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def procesar_cuentas_por_cobrar_excel(file_path, fecha_corte_str):
+    logger.info(f"Iniciando procesamiento para archivo: {file_path}, fecha corte: {fecha_corte_str}")
     fecha_corte = datetime.strptime(fecha_corte_str, "%d/%m/%Y")
     with pd.ExcelFile(file_path) as xls:
         df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], header=None)
@@ -152,9 +159,11 @@ def procesar_cuentas_por_cobrar_excel(file_path, fecha_corte_str):
 
     # Guardar en un archivo temporal
     temp_dir = tempfile.gettempdir()
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f") # Añadido microsegundos para más unicidad
     output_path = os.path.join(temp_dir, f"cuentas_por_cobrar_{timestamp}.xlsx")
+    logger.info(f"Intentando guardar archivo Excel en: {output_path}")
     wb.save(output_path)
+    logger.info(f"Archivo Excel guardado exitosamente en: {output_path}")
     return output_path
 
 @app.post("/procesar-cuentas-por-cobrar")
@@ -162,29 +171,61 @@ async def procesar_cuentas_por_cobrar(
     file: UploadFile = File(...),
     fecha_corte: str = Form(...)
 ):
+    logger.info(f"Recibida solicitud para procesar archivo: {file.filename}, fecha_corte: {fecha_corte}")
+    temp_file_path = None
+    output_path = None
+    output_bytes = None
     try:
         # Guardar el archivo temporalmente
         temp_dir = tempfile.gettempdir()
-        temp_file_path = os.path.join(temp_dir, file.filename)
-        with open(temp_file_path, "wb") as buffer:
+        # Usar un nombre de archivo temporal más robusto
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx", dir=temp_dir) as temp_file:
             content = await file.read()
-            buffer.write(content)
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+        logger.info(f"Archivo temporal guardado en: {temp_file_path}")
 
-        # Procesar el archivo
+        # Procesar el archivo para obtener la ruta del resultado
+        logger.info("Llamando a procesar_cuentas_por_cobrar_excel...")
         output_path = procesar_cuentas_por_cobrar_excel(temp_file_path, fecha_corte)
+        logger.info(f"Procesamiento completado. Archivo resultante en disco: {output_path}")
 
-        # Limpiar archivo temporal
-        os.remove(temp_file_path)
+        # Leer el contenido del archivo generado en memoria
+        try:
+            with open(output_path, 'rb') as f:
+                output_bytes = f.read()
+            logger.info(f"Archivo leído en memoria, tamaño: {len(output_bytes)} bytes")
+        except Exception as e_read:
+            logger.error(f"Error al leer el archivo generado {output_path} en memoria: {e_read}", exc_info=True)
+            raise
 
-        # Devolver el archivo procesado
-        return FileResponse(
-            path=output_path,
-            filename=os.path.basename(output_path),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        # Devolver el contenido directamente
+        file_name_for_download = os.path.basename(output_path)
+        logger.info(f"Preparando Response con contenido binario para: {file_name_for_download}")
+        return Response(
+            content=output_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={f'Content-Disposition': f'attachment; filename="{file_name_for_download}"'} # Cabecera para descarga
         )
 
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Error en el endpoint /procesar-cuentas-por-cobrar: {e}", exc_info=True)
+        return {"error": f"Ocurrió un error procesando el archivo: {str(e)}"}
+
+    finally:
+        # Asegurar limpieza de archivos temporales (subido y generado)
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+                logger.info(f"Archivo temporal de subida eliminado: {temp_file_path}")
+            except Exception as e_remove_temp:
+                logger.error(f"Error al eliminar archivo temporal de subida {temp_file_path}: {e_remove_temp}")
+        if output_path and os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+                logger.info(f"Archivo temporal generado eliminado: {output_path}")
+            except Exception as e_remove_output:
+                logger.error(f"Error al eliminar archivo temporal generado {output_path}: {e_remove_output}")
 
 if __name__ == "__main__":
     import uvicorn
