@@ -10,6 +10,8 @@ import tempfile
 import logging
 import io
 from fastapi.middleware.cors import CORSMiddleware
+# Importar el router del módulo de margen
+from margen import router as margen_router
 
 app = FastAPI(title="Procesador de Cuentas por Cobrar",
              description="API para procesar archivos de cuentas por cobrar y generar reportes de Aging")
@@ -35,6 +37,9 @@ app.add_middleware(
 # Configurar logging básico
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Incluir el router del módulo de margen
+app.include_router(margen_router)
 
 def procesar_cuentas_por_cobrar_excel(file_path, fecha_corte_str):
     logger.info(f"Iniciando procesamiento para archivo: {file_path}, fecha corte: {fecha_corte_str}")
