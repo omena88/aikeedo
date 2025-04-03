@@ -9,9 +9,28 @@ import os
 import tempfile
 import logging
 import io
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Procesador de Cuentas por Cobrar",
              description="API para procesar archivos de cuentas por cobrar y generar reportes de Aging")
+
+# Configuración CORS
+# Lista de orígenes permitidos. Reemplaza "*" con tu dominio de WordPress en producción.
+origins = [
+    "*", # Permitir todos los orígenes (útil para desarrollo/pruebas)
+    # "https://tu-dominio-wordpress.com", # Ejemplo para producción
+    # "http://tu-dominio-wordpress.com", # Si también usa http
+    # "http://localhost:xxxx" # Si pruebas desde un servidor local
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True, # Permitir cookies si las usas (importante para algunas configs)
+    allow_methods=["POST", "OPTIONS"], # Métodos HTTP permitidos
+    allow_headers=["*"], # Cabeceras permitidas (ej. Content-Type)
+    expose_headers=["content-disposition"] # Cabeceras que el navegador puede leer (para el nombre del archivo)
+)
 
 # Configurar logging básico
 logging.basicConfig(level=logging.INFO)
