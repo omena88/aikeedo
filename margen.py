@@ -52,8 +52,8 @@ def procesar_margenes(
         key_cols = ['Fecha', 'T. Doc.', 'Número', 'Cliente', 'Artículo', 'Descripción', 'Cantidad', 'Und.']
         for col in key_cols:
             if col == 'Fecha':
-                me_df[col] = pd.to_datetime(me_df[col])
-                mn_df[col] = pd.to_datetime(mn_df[col])
+                me_df[col] = pd.to_datetime(me_df[col], errors='coerce')
+                mn_df[col] = pd.to_datetime(mn_df[col], errors='coerce')
             else:
                  # Intentar convertir a string como método genérico, ajustar si es necesario
                  me_df[col] = me_df[col].astype(str)
