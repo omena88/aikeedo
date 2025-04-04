@@ -155,12 +155,12 @@ def procesar_margenes(
         ventas_final_df = ventas_df[final_cols]
         logger.info("Columnas finales seleccionadas y ordenadas.")
 
-        # Exportar a Excel en memoria
+        # Exportar a Excel en memoria usando el motor por defecto (openpyxl)
         output_buffer = io.BytesIO()
-        with pd.ExcelWriter(output_buffer, engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(output_buffer) as writer:
             ventas_final_df.to_excel(writer, index=False, sheet_name='Reporte Margen')
         output_buffer.seek(0)
-        logger.info("DataFrame final exportado a buffer de Excel.")
+        logger.info("DataFrame final exportado a buffer de Excel (usando openpyxl).")
 
         return output_buffer.getvalue()
 
